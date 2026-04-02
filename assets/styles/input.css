@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+@source "../../templates/**/*.twig";
+@source "../../src/**/*.php";
+@source "../**/*.js";
