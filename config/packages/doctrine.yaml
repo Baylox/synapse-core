@@ -8,7 +8,17 @@ doctrine:
 
         profiling_collect_backtrace: '%kernel.debug%'
         use_savepoints: true
+
+        # pgvector column type used by App\Entity\DocumentChunk::$embedding
+        # (provided by theodo-group/llphant). Requires the `vector` extension
+        # in PostgreSQL — created by the initial migration.
+        types:
+            vector: LLPhant\Embeddings\VectorStores\Doctrine\VectorType
     orm:
+        # Nearest-neighbour search operator (pgvector `<->`) exposed to DQL.
+        dql:
+            string_functions:
+                L2_DISTANCE: LLPhant\Embeddings\VectorStores\Doctrine\PgVectorL2OperatorDql
         auto_generate_proxy_classes: true
         enable_lazy_ghost_objects: true
         report_fields_where_declared: true

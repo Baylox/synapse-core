@@ -2,7 +2,9 @@
 services:
 ###> doctrine/doctrine-bundle ###
   database:
-    image: postgres:${POSTGRES_VERSION:-16}-alpine
+    # pgvector/pgvector ships PostgreSQL with the `vector` extension that
+    # App\Entity\DocumentChunk relies on for similarity search.
+    image: pgvector/pgvector:pg${POSTGRES_VERSION:-16}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-app}
       # You should definitely change the password in production

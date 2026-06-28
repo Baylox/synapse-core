@@ -1,0 +1,50 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Synapse — Knowledge Chat{% endblock %}
+
+{% block body %}
+<main class="app" data-controller="chat">
+    <header class="app__header">
+        <h1>⚫️ Synapse</h1>
+        <p>Ask questions grounded in your documents.</p>
+    </header>
+
+    <section class="app__layout">
+        <aside class="sidebar">
+            <h2>Knowledge base</h2>
+
+            <form data-chat-target="uploadForm" data-action="submit->chat#upload" class="upload">
+                <input type="file" name="file" required>
+                <button type="submit">Upload &amp; ingest</button>
+            </form>
+
+            <ul class="documents" data-chat-target="documents">
+                {% for document in documents %}
+                    <li data-status="{{ document.status.value }}">
+                        <strong>{{ document.title }}</strong>
+                        <span>{{ document.status.value }} · {{ document.chunkCount }} chunks</span>
+                    </li>
+                {% else %}
+                    <li class="empty">No documents yet — upload one to get started.</li>
+                {% endfor %}
+            </ul>
+        </aside>
+
+        <div class="chat">
+            <div class="chat__messages" data-chat-target="messages"></div>
+
+            <form class="chat__input" data-action="submit->chat#ask">
+                <input
+                    type="text"
+                    name="question"
+                    placeholder="Ask something about your documents…"
+                    autocomplete="off"
+                    data-chat-target="question"
+                    required
+                >
+                <button type="submit" data-chat-target="submit">Ask</button>
+            </form>
+        </div>
+    </section>
+</main>
+{% endblock %}

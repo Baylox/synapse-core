@@ -18,6 +18,21 @@ services:
     # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
+        exclude:
+            - '../src/Entity/'
+            - '../src/Enum/'
+            - '../src/Message/'
+            - '../src/Service/Rag/RagAnswer.php'
+            - '../src/Kernel.php'
+
+    # --- LLM clients (LLPhant) -------------------------------------------
+    # Built from env via our factory so the rest of the app can simply
+    # type-hint OpenAIChat / EmbeddingGeneratorInterface and get a wired client.
+    LLPhant\Chat\OpenAIChat:
+        factory: ['@App\Service\Llm\OpenAiClientFactory', 'createChatModel']
+
+    LLPhant\Embeddings\EmbeddingGenerator\EmbeddingGeneratorInterface:
+        factory: ['@App\Service\Llm\OpenAiClientFactory', 'createEmbeddingGenerator']
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
