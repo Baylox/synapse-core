@@ -9,10 +9,13 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-final class HomeController extends AbstractController
+/**
+ * Renders the chat UI. Single-action (invokable) controller.
+ */
+final class ShowChatController extends AbstractController
 {
     #[Route('/', name: 'app_home', methods: ['GET'])]
-    public function index(KnowledgeDocumentRepository $documents): Response
+    public function __invoke(KnowledgeDocumentRepository $documents): Response
     {
         return $this->render('chat/index.html.twig', [
             'documents' => $documents->findAllNewestFirst(),

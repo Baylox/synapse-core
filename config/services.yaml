@@ -19,6 +19,7 @@ services:
     App\:
         resource: '../src/'
         exclude:
+            - '../src/Dto/'
             - '../src/Entity/'
             - '../src/Enum/'
             - '../src/Message/'

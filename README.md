@@ -31,9 +31,16 @@ Upload documents (PDF, Word, text…), and ask questions that are answered
 | Service | `Rag\DocumentIngestor` | read → split → embed → persist chunks. |
 | Service | `Rag\RagPipeline` | embed query → retrieve → prompt → answer (`RagAnswer`). |
 | Messaging | `Message\IngestDocument` + handler | Runs ingestion off the request (Messenger). |
-| HTTP | `Controller\HomeController` | Chat UI. |
-| HTTP | `Controller\Api\ChatController` | `POST /api/chat`. |
-| HTTP | `Controller\Api\DocumentController` | `GET/POST /api/documents`. |
+| DTO | `Dto\Request\ChatRequest` | Validated input (`#[MapRequestPayload]`). |
+| DTO | `Dto\Response\{ChatResponse, SourceView, DocumentView}` | Typed read models for the API. |
+| HTTP | `Controller\ShowChatController` | Chat UI (`GET /`). |
+| HTTP | `Controller\Chat\AskQuestionController` | `POST /api/chat`. |
+| HTTP | `Controller\Document\ListDocumentsController` | `GET /api/documents`. |
+| HTTP | `Controller\Document\UploadDocumentController` | `POST /api/documents`. |
+
+**Pattern.** Each HTTP action is a single-action invokable controller. Controllers
+only map **DTO → Service → DTO**; business logic lives in `Service\`, queries in
+`Repository\`, and request validation is declarative on the request DTOs.
 
 Vector search reuses LLPhant's Doctrine integration: the `vector` column type
 and the `L2_DISTANCE` DQL function (registered in `config/packages/doctrine.yaml`).
