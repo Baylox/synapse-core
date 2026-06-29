@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                  https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="App\Knowledge\Domain\Model\KnowledgeDocument" table="knowledge_document">
+        <indexes>
+            <index name="idx_document_status" columns="status"/>
+        </indexes>
+
+        <id name="id" type="integer" column="id">
+            <generator strategy="IDENTITY"/>
+        </id>
+
+        <field name="title" type="string" length="255"/>
+        <field name="sourceType" type="string" length="32" column="source_type" enum-type="App\Knowledge\Domain\Model\SourceType"/>
+        <field name="sourcePath" type="string" length="1024" column="source_path"/>
+        <field name="status" type="string" length="32" enum-type="App\Knowledge\Domain\Model\DocumentStatus"/>
+        <field name="chunkCount" type="integer" column="chunk_count"/>
+        <field name="errorMessage" type="text" column="error_message" nullable="true"/>
+        <field name="createdAt" type="datetime_immutable" column="created_at"/>
+        <field name="ingestedAt" type="datetime_immutable" column="ingested_at" nullable="true"/>
+    </entity>
+</doctrine-mapping>

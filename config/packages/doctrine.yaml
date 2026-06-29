@@ -9,16 +9,15 @@ doctrine:
         profiling_collect_backtrace: '%kernel.debug%'
         use_savepoints: true
 
-        # pgvector column type used by App\Entity\DocumentChunk::$embedding
-        # (provided by theodo-group/llphant). Requires the `vector` extension
-        # in PostgreSQL — created by the initial migration.
+        # Maps the Embedding value object onto a pgvector `vector(N)` column.
+        # Requires the `vector` extension in PostgreSQL (created by the migration).
         types:
-            vector: LLPhant\Embeddings\VectorStores\Doctrine\VectorType
+            embedding: App\Shared\Infrastructure\Doctrine\Type\EmbeddingType
+        # Tell DBAL that the DB-reported `vector` column type maps back to our
+        # `embedding` type (needed for schema introspection / validation).
+        mapping_types:
+            vector: embedding
     orm:
-        # Nearest-neighbour search operator (pgvector `<->`) exposed to DQL.
-        dql:
-            string_functions:
-                L2_DISTANCE: LLPhant\Embeddings\VectorStores\Doctrine\PgVectorL2OperatorDql
         auto_generate_proxy_classes: true
         enable_lazy_ghost_objects: true
         report_fields_where_declared: true
@@ -26,14 +25,16 @@ doctrine:
         naming_strategy: doctrine.orm.naming_strategy.underscore_number_aware
         identity_generation_preferences:
             Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
-        auto_mapping: true
+        # Hexagonal: domain models are pure PHP, mapped via XML in each
+        # context's Infrastructure layer (no ORM attributes in the domain).
+        auto_mapping: false
         mappings:
-            App:
-                type: attribute
+            Knowledge:
+                type: xml
                 is_bundle: false
-                dir: '%kernel.project_dir%/src/Entity'
-                prefix: 'App\Entity'
-                alias: App
+                dir: '%kernel.project_dir%/src/Knowledge/Infrastructure/Doctrine/mapping'
+                prefix: 'App\Knowledge\Domain\Model'
+                alias: Knowledge
         controller_resolver:
             auto_mapping: false
 

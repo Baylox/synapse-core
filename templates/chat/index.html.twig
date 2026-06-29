@@ -20,9 +20,9 @@
 
             <ul class="documents" data-chat-target="documents">
                 {% for document in documents %}
-                    <li data-status="{{ document.status.value }}">
+                    <li data-status="{{ document.status }}">
                         <strong>{{ document.title }}</strong>
-                        <span>{{ document.status.value }} · {{ document.chunkCount }} chunks</span>
+                        <span>{{ document.status }} · {{ document.chunks }} chunks</span>
                     </li>
                 {% else %}
                     <li class="empty">No documents yet — upload one to get started.</li>

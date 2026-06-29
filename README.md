@@ -4,46 +4,53 @@ A **Retrieval-Augmented Generation (RAG)** core built on Symfony 7.4 + LLPhant.
 Upload documents (PDF, Word, text…), and ask questions that are answered
 **grounded in your own content** rather than the model's general knowledge.
 
-> Status: foundational skeleton + architecture. The pipeline is wired
-> end-to-end; tune prompts, add auth, and enrich the UI as you grow.
+> Status: foundational architecture. Wired end-to-end and validated against a
+> real pgvector database (persistence, embedding round-trip and nearest-neighbour
+> search all confirmed). Designed to absorb growing AI complexity.
 
-## How it works
+## Architecture — hexagonal, by bounded context
+
+The domain is **pure PHP** (no framework or ORM annotations). Each context is
+split into `Domain` (models, ports, events), `Application` (use cases), and
+`Infrastructure` (adapters). Dependencies point inward; the outside world plugs
+in through ports.
 
 ```
-                 ┌─────────────── WRITE side (ingestion) ───────────────┐
- upload file ──▶ DocumentUploader ──▶ [async] IngestDocument ──▶ DocumentIngestor
-                 store + KnowledgeDocument(pending)        read → split → embed → DocumentChunk(+vector)
-
-                 ┌─────────────── READ side (querying) ─────────────────┐
- question ─────▶ RagPipeline ──▶ embed question ──▶ DocumentChunkRepository::findNearest (pgvector)
-                              └──▶ build context + system prompt ──▶ OpenAIChat ──▶ grounded answer + citations
+src/
+├── Shared/        Embedding VO · DomainEvent + dispatcher · EmbeddingType (Doctrine) · OpenAI factory
+├── Knowledge/     documents & chunks, ingestion (multi-source)
+│   ├── Domain/         KnowledgeDocument (aggregate, emits events), DocumentChunk,
+│   │                   ports: KnowledgeDocuments, DocumentChunks, Embedder, Reader,
+│   │                   Splitter, IngestionStrategy/-ies, FileStorage
+│   ├── Application/    UploadDocumentHandler, IngestDocumentHandler
+│   └── Infrastructure/ Doctrine (XML mapping) · LLPhant adapters · ingestion strategies · Messenger
+├── Reasoning/     the AI "thinking" — where complexity will grow
+│   ├── Domain/         Question, Answer, Citation; ports: ChatModel, KnowledgeRetriever,
+│   │                   Tool/ToolBox; ReasoningStrategy/-ies
+│   ├── Application/    AnswerQuestionHandler
+│   └── Infrastructure/ RagReasoningStrategy (default) · AgenticReasoningStrategy (tool-loop seam)
+│                       · LlphantChatModel · KnowledgeBaseRetriever (cross-context ACL)
+└── UI/            driving adapters: HTTP controllers (1 action each) + request/response DTOs
 ```
 
-### Key components (`src/`)
+### Seams for the four complexity axes
 
-| Layer | Class | Responsibility |
-|-------|-------|----------------|
-| Entity | `KnowledgeDocument` | A source file and its ingestion lifecycle (`DocumentStatus`). |
-| Entity | `DocumentChunk` | An embedded slice stored in a pgvector `vector(1536)` column. |
-| Entity | `Conversation` / `ChatMessage` | Chat history (with optional source citations). |
-| Service | `Llm\OpenAiClientFactory` | Builds LLPhant `OpenAIChat` + embedding generator from env. |
-| Service | `Rag\DocumentUploader` | Stores an upload, then dispatches async ingestion. |
-| Service | `Rag\DocumentIngestor` | read → split → embed → persist chunks. |
-| Service | `Rag\RagPipeline` | embed query → retrieve → prompt → answer (`RagAnswer`). |
-| Messaging | `Message\IngestDocument` + handler | Runs ingestion off the request (Messenger). |
-| DTO | `Dto\Request\ChatRequest` | Validated input (`#[MapRequestPayload]`). |
-| DTO | `Dto\Response\{ChatResponse, SourceView, DocumentView}` | Typed read models for the API. |
-| HTTP | `Controller\ShowChatController` | Chat UI (`GET /`). |
-| HTTP | `Controller\Chat\AskQuestionController` | `POST /api/chat`. |
-| HTTP | `Controller\Document\ListDocumentsController` | `GET /api/documents`. |
-| HTTP | `Controller\Document\UploadDocumentController` | `POST /api/documents`. |
+| Axis | Seam |
+|------|------|
+| **Agentic orchestration** | `Reasoning\Domain\Port\Tool` + `ToolBox` + `AgenticReasoningStrategy` (ReAct loop scaffolded). |
+| **Strategy per input** | `ReasoningStrategy::supports(Question)` + `ReasoningStrategies` resolver (priority-ordered). |
+| **Rich business rules** | Aggregates (`KnowledgeDocument`) own invariants & emit `DomainEvent`s. |
+| **Multi-source / multi-base** | `IngestionStrategy::supports(SourceType)` + `IngestionStrategies` registry; repositories are ports. |
 
-**Pattern.** Each HTTP action is a single-action invokable controller. Controllers
-only map **DTO → Service → DTO**; business logic lives in `Service\`, queries in
-`Repository\`, and request validation is declarative on the request DTOs.
+A request flows: **HTTP DTO → Application use case → Domain (via ports) →
+Infrastructure adapters**. Adding a tool, an ingestion strategy, or a reasoning
+strategy is a new class tagged for its registry — no change to application or
+domain code.
 
-Vector search reuses LLPhant's Doctrine integration: the `vector` column type
-and the `L2_DISTANCE` DQL function (registered in `config/packages/doctrine.yaml`).
+Persistence keeps the domain pure via XML mapping in each context's
+`Infrastructure/Doctrine/mapping`, and a custom `EmbeddingType` maps the
+`Embedding` value object onto a pgvector `vector(1536)` column. Nearest-neighbour
+search uses a native pgvector `<->` query in `DoctrineDocumentChunks`.
 
 ## Setup
 
@@ -83,12 +90,15 @@ Open <http://localhost:8000>, upload a document, and start asking questions.
 
 ## Notes / next steps
 
-- **Embedding dimension** is pinned to 1536 (`DocumentChunk::EMBEDDING_DIMENSIONS`).
-  Changing the embedding model means a new migration that re-creates the column.
+- **Embedding dimension** is pinned to 1536 (`EmbeddingType::DEFAULT_DIMENSIONS`
+  + the mapping length). Changing the embedding model means a new migration that
+  re-creates the column.
 - **Security**: the firewall is currently open (`config/packages/security.yaml`).
   Add real authentication before exposing this beyond local use.
-- The chat is stateless today; `Conversation`/`ChatMessage` are in place to make
-  it conversation-aware (history + follow-ups) next.
+- **Conversation** is a future bounded context (stateful chat / follow-ups); the
+  `Reasoning` ports already accommodate it.
+- Fill in `AgenticReasoningStrategy` (the ReAct loop) and add concrete `Tool`s as
+  the agentic requirements firm up.
 
 ## Tests
 

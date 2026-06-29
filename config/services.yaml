@@ -3,37 +3,61 @@
 # This file is the entry point to configure your own services.
 # Files in the packages/ subdirectory configure your dependencies.
 # See also https://symfony.com/doc/current/service_container/import.html
-
-# Put parameters here that don't need to change on each machine where the app is deployed
-# https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
 
 services:
-    # default configuration for services in *this* file
     _defaults:
-        autowire: true      # Automatically injects dependencies in your services.
-        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+        autowire: true
+        autoconfigure: true
 
-    # makes classes in src/ available to be used as services
-    # this creates a service per class whose id is the fully-qualified class name
+    # Auto-tag strategy/tool implementations so the registries discover them.
+    _instanceof:
+        App\Knowledge\Domain\Ingestion\IngestionStrategy:
+            tags: ['app.ingestion_strategy']
+        App\Reasoning\Domain\Port\Tool:
+            tags: ['app.reasoning_tool']
+
+    # Register classes in src/. Pure data (domain models, value objects, events,
+    # DTOs, commands/queries, messages) are NOT services.
     App\:
         resource: '../src/'
         exclude:
-            - '../src/Dto/'
-            - '../src/Entity/'
-            - '../src/Enum/'
-            - '../src/Message/'
-            - '../src/Service/Rag/RagAnswer.php'
+            - '../src/**/Domain/Model/'
+            - '../src/**/Domain/Event/'
+            - '../src/Shared/Domain/ValueObject/'
+            - '../src/**/Application/Command/'
+            - '../src/Reasoning/Application/AnswerQuestionQuery.php'
+            - '../src/Knowledge/Infrastructure/Messenger/IngestDocumentMessage.php'
+            - '../src/UI/Http/Dto/'
             - '../src/Kernel.php'
 
-    # --- LLM clients (LLPhant) -------------------------------------------
-    # Built from env via our factory so the rest of the app can simply
-    # type-hint OpenAIChat / EmbeddingGeneratorInterface and get a wired client.
+    # --- Ports -> adapters (hexagonal wiring) ----------------------------
+    App\Shared\Domain\Event\DomainEventDispatcher: '@App\Shared\Infrastructure\Event\MessengerDomainEventDispatcher'
+
+    App\Knowledge\Domain\Repository\KnowledgeDocuments: '@App\Knowledge\Infrastructure\Doctrine\DoctrineKnowledgeDocuments'
+    App\Knowledge\Domain\Repository\DocumentChunks: '@App\Knowledge\Infrastructure\Doctrine\DoctrineDocumentChunks'
+    App\Knowledge\Domain\Service\FileStorage: '@App\Knowledge\Infrastructure\Storage\LocalFileStorage'
+    App\Knowledge\Application\Port\IngestionScheduler: '@App\Knowledge\Infrastructure\Messenger\MessengerIngestionScheduler'
+    App\Knowledge\Domain\Ingestion\Embedder: '@App\Knowledge\Infrastructure\Llphant\LlphantEmbedder'
+    App\Knowledge\Domain\Ingestion\DocumentReader: '@App\Knowledge\Infrastructure\Llphant\LlphantDocumentReader'
+    App\Knowledge\Domain\Ingestion\TextSplitter: '@App\Knowledge\Infrastructure\Llphant\LlphantTextSplitter'
+    App\Knowledge\Domain\Ingestion\IngestionStrategies: '@App\Knowledge\Infrastructure\Ingestion\IngestionStrategyRegistry'
+
+    App\Reasoning\Domain\Port\ChatModel: '@App\Reasoning\Infrastructure\Llphant\LlphantChatModel'
+    App\Reasoning\Domain\Port\KnowledgeRetriever: '@App\Reasoning\Infrastructure\Knowledge\KnowledgeBaseRetriever'
+    App\Reasoning\Domain\Port\ToolBox: '@App\Reasoning\Infrastructure\Tool\TaggedToolBox'
+    App\Reasoning\Domain\Strategy\ReasoningStrategies: '@App\Reasoning\Infrastructure\Strategy\ReasoningStrategyRegistry'
+
+    # Reasoning strategies, ordered by priority (higher = tried first). RAG is
+    # the always-true fallback, so it must be last.
+    App\Reasoning\Infrastructure\Strategy\AgenticReasoningStrategy:
+        tags: [{ name: 'app.reasoning_strategy', priority: 10 }]
+    App\Reasoning\Infrastructure\Strategy\RagReasoningStrategy:
+        tags: [{ name: 'app.reasoning_strategy', priority: -10 }]
+
+    # --- LLM clients (LLPhant), built from env --------------------------
     LLPhant\Chat\OpenAIChat:
-        factory: ['@App\Service\Llm\OpenAiClientFactory', 'createChatModel']
+        factory: ['@App\Shared\Infrastructure\Llm\OpenAiClientFactory', 'createChatModel']
 
     LLPhant\Embeddings\EmbeddingGenerator\EmbeddingGeneratorInterface:
-        factory: ['@App\Service\Llm\OpenAiClientFactory', 'createEmbeddingGenerator']
-
-    # add more service definitions when explicit configuration is needed
-    # please note that last definitions always *replace* previous ones
+        factory: ['@App\Shared\Infrastructure\Llm\OpenAiClientFactory', 'createEmbeddingGenerator']
